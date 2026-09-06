@@ -41,7 +41,13 @@ export const coordinationToolSpecs: ToolSpec[] = [
 
 export interface CoordinationConfig {
   /** Shared directory all agents read/write — the cross-agent source of truth. */
-  readonly syncDir: string;
+  /**
+   * The shared sync directory, or a thunk resolving it.
+   *
+   * A thunk so a fail-closed root is demanded when `agent_sync` is actually used rather than when
+   * the registry is built -- the registry is assembled by callers that never touch this tool.
+   */
+  readonly syncDir: string | (() => string);
   /** Identifier of the agent doing the writing (recorded on each entry). */
   readonly agentId: string;
   /** Injectable clock for deterministic timestamps in tests. */
@@ -65,14 +71,18 @@ export function createCoordinationToolHandlers(config: CoordinationConfig): Map<
   const handlers = new Map<string, ToolHandler>();
   const clock = config.clock ?? Date.now;
 
-  const ensureDir = (): void => {
-    if (!existsSync(config.syncDir)) mkdirSync(config.syncDir, { recursive: true });
+  const syncDir = (): string => (typeof config.syncDir === 'function' ? config.syncDir() : config.syncDir);
+
+  const ensureDir = (): string => {
+    const dir = syncDir();
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    return dir;
   };
 
   handlers.set('agent_sync', async (args): Promise<ToolResult> => {
     const action = args.action as string;
     try {
-      ensureDir();
+      const dir = ensureDir();
       switch (action) {
         case 'write': {
           const key = args.key as string;
@@ -84,17 +94,17 @@ export function createCoordinationToolHandlers(config: CoordinationConfig): Map<
           // rename(2) is atomic within a directory, so a concurrent reader never sees a
           // half-written entry and two agents writing the same key never tear the file —
           // the last rename wins cleanly instead of interleaving bytes.
-          const dest = keyFile(config.syncDir, key);
+          const dest = keyFile(dir, key);
           const safe = key.replace(/[^a-zA-Z0-9._-]/g, '_');
           // Temp name ends in `.tmp` (not `.json`) so a concurrent `list` never sees it.
-          const tmp = join(config.syncDir, `.${safe}.${process.pid}.${clock()}.tmp`);
+          const tmp = join(dir, `.${safe}.${process.pid}.${clock()}.tmp`);
           writeFileSync(tmp, JSON.stringify(entry, null, 2));
           renameSync(tmp, dest);
           return { ok: true, output: `wrote "${key}" (${entry.value.length} chars) as ${config.agentId}` };
         }
         case 'read': {
           const key = args.key as string;
-          const file = keyFile(config.syncDir, key);
+          const file = keyFile(dir, key);
           if (typeof key !== 'string' || !existsSync(file)) {
             return { ok: false, output: '', error: `no entry for key "${key}"` };
           }
@@ -105,12 +115,12 @@ export function createCoordinationToolHandlers(config: CoordinationConfig): Map<
           };
         }
         case 'list': {
-          const files = existsSync(config.syncDir)
-            ? readdirSync(config.syncDir).filter((f) => f.endsWith('.json') && f !== 'broadcast.log.json')
+          const files = existsSync(dir)
+            ? readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'broadcast.log.json')
             : [];
           const entries = files.map((f) => {
             try {
-              const e = JSON.parse(readFileSync(join(config.syncDir, f), 'utf-8')) as SyncEntry;
+              const e = JSON.parse(readFileSync(join(dir, f), 'utf-8')) as SyncEntry;
               return { key: e.key, agentId: e.agentId, ts: new Date(e.ts).toISOString() };
             } catch {
               return null;
@@ -123,7 +133,7 @@ export function createCoordinationToolHandlers(config: CoordinationConfig): Map<
         }
         case 'broadcast': {
           const line = JSON.stringify({ agentId: config.agentId, value: String(args.value ?? ''), ts: clock() });
-          appendFileSync(join(config.syncDir, 'broadcast.log'), line + '\n');
+          appendFileSync(join(dir, 'broadcast.log'), line + '\n');
           return { ok: true, output: `broadcast from ${config.agentId}` };
         }
         default:

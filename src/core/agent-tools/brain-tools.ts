@@ -21,6 +21,7 @@ import type { ToolSpec, ToolHandler, ToolResult } from "../tools.js";
 import { GbrainError, searchBrain, thinkBrain, putPage, syncMemory } from "../gbrain-bridge.js";
 import { scanForInjection } from "./prompt-injection.js";
 import type { BrainGovernance } from "./memory-governance.js";
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from "../data-roots.js";
 
 export interface BrainToolConfig {
   /**
@@ -41,9 +42,7 @@ const obj = (
 
 /** Default memory tree synced into the brain when the caller doesn't name one. */
 function defaultMemoryRoot(): string {
-  return process.env["LAB_MEMORY_ROOT"]
-    ?? process.env["MEMORY_STORE_ROOT"]
-    ?? "/pehverse/repos/lab-utilities/lab-memory";
+  return requiredDataRoot(...DATA_ROOT_VARIABLES.memory);
 }
 
 export const brainToolSpecs: ToolSpec[] = [

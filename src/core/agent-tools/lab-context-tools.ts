@@ -19,15 +19,14 @@ import { join } from 'node:path';
 import type { ToolSpec, ToolHandler } from '../tools.js';
 import { scanForInjection } from './prompt-injection.js';
 import { sanitizeMessage } from './input-sanitization.js';
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from '../data-roots.js';
 
 /** Lazy-loaded lab-memory store — initialized on first use. */
 let _store: any = null;
 let _storeRoot: string | null = null;
 
 function getStoreRoot(): string {
-  return process.env['LAB_MEMORY_ROOT']
-    ?? process.env['MEMORY_STORE_ROOT']
-    ?? '/pehverse/repos/lab-utilities/lab-memory';
+  return requiredDataRoot(...DATA_ROOT_VARIABLES.memory);
 }
 
 async function getStore() {

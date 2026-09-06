@@ -24,30 +24,13 @@ import { fileURLToPath } from 'node:url';
 import type { ToolSpec, ToolHandler } from '../tools.js';
 import { scanForInjection } from './prompt-injection.js';
 import { sanitizeMessage } from './input-sanitization.js';
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from '../data-roots.js';
 
 /** This agent's labmem namespace (scope:agent / scope:project key). */
 const AGENT = 'pehlichi-pub';
 
-/**
- * Portable default labmem root: the lab's labmem in the sibling lab-utilities/lab-memory, resolved by
- * walking up to `ecosystem/` and crossing into its sibling so the code ships no absolute lab
- * path. That tree ships CODE only — set LABMEM_ROOT to point at the real
- * mutable memory DATA (the home lab sets it via .env; public installs set it to
- * their own store).
- */
-function defaultLabmemRoot(): string {
-  let d = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 12; i++) {
-    if (basename(d) === 'ecosystem') return join(dirname(d), 'lab-utilities', 'lab-memory', 'labmem');
-    const parent = dirname(d);
-    if (parent === d) break;
-    d = parent;
-  }
-  return join(process.cwd(), 'lab-memory', 'labmem');
-}
-
 function labmemRoot(): string {
-  return process.env['LABMEM_ROOT'] ?? defaultLabmemRoot();
+  return requiredDataRoot(...DATA_ROOT_VARIABLES.vault);
 }
 
 /** Lazy dynamic import of labmem: built dist first (compiled-safe), TS source fallback (tsx dev). */

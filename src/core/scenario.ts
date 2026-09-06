@@ -14,9 +14,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { DriverAction } from "./driver.js";
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from "./data-roots.js";
 
 /** The sibling lab-store repo (single source of truth for skillpack content). */
-const REAL_LAB_STORE = process.env.LAB_STORE_ROOT ?? "/pehverse/repos/lab-utilities/lab-store";
+/**
+ * The real lab-store, resolved and validated on USE.
+ *
+ * Not at import time: a module-level throw takes down every test file that imports this one,
+ * whether or not it ever seeds a skillpack, turning one missing variable into a suite-wide outage.
+ */
+const realLabStore = (): string => requiredDataRoot(...DATA_ROOT_VARIABLES.store);
 
 /**
  * Copy named modules (skillpacks/conventions) from the REAL lab-store into a
@@ -24,17 +31,18 @@ const REAL_LAB_STORE = process.env.LAB_STORE_ROOT ?? "/pehverse/repos/lab-utilit
  * (one source of truth) while keeping writes contained to the tmp store.
  */
 export function seedSkillpacks(storeRoot: string, names: readonly string[]): void {
+  const source = realLabStore();
   for (const name of names) {
     let copied = false;
     for (const type of ["skills", "conventions"]) {
-      const src = join(REAL_LAB_STORE, type, `${name}.md`);
+      const src = join(source, type, `${name}.md`);
       if (!existsSync(src)) continue;
       mkdirSync(join(storeRoot, type), { recursive: true });
       copyFileSync(src, join(storeRoot, type, `${name}.md`));
       copied = true;
       break;
     }
-    if (!copied) throw new Error(`seedSkillpacks: module "${name}" not found in ${REAL_LAB_STORE}`);
+    if (!copied) throw new Error(`seedSkillpacks: module "${name}" not found in ${source}`);
   }
 }
 

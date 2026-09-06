@@ -43,6 +43,7 @@ import { ChatSession } from './lib/chat.js';
 import { bridgeRegistry } from '../../src/core/bridges/registry.js';
 import { listMemory } from 'lab-memory';
 import { ReceiptStore, type Receipt } from '../../src/core/receipt-store.js';
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from '../../src/core/data-roots.js';
 
 const PORT = parseInt(process.env.PEHLICHI_PORT || '18832', 10);
 const HOST = process.env.PEHLICHI_HOST || '127.0.0.1';
@@ -246,7 +247,7 @@ export function createPehServer(opts: PehServerOptions = {}): {
   const skin = loadSkin();
   const personality = loadPersonality();
   const workspaceRoot = opts.workspaceRoot ?? process.env.PEHLICHI_WORKSPACE ?? '/pehverse/repos/ecosystem/pehlichi-pub';
-  const labStoreRoot = opts.labStoreRoot ?? process.env.LAB_STORE_ROOT ?? join(workspaceRoot, '..', 'lab-store');
+  const labStoreRoot = opts.labStoreRoot ?? requiredDataRoot(...DATA_ROOT_VARIABLES.store);
   const apiKey = resolveApiKey();
 
   // The kernel's tool source: the full agent tool suite (Blocker 1).

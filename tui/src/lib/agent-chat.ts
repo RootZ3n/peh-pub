@@ -41,6 +41,7 @@ import { sanitizeToolDefinitions } from '../../../src/core/agent-tools/schema-sa
 import { classifyError } from '../../../src/core/agent-tools/error-classifier.js';
 import { withRetry, isRetryable, sleep } from '../../../src/core/agent-tools/retry.js';
 import { labContextToolSpecs, createLabContextToolHandlers } from '../../../src/core/agent-tools/lab-context-tools.js';
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from '../../../src/core/data-roots.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -416,7 +417,7 @@ export class AgentChatSession {
               try {
                 result = await toolDef.handler(toolArgs, {
                   workspaceRoot: this.workspaceRoot,
-                  labStoreRoot: process.env.LAB_STORE_ROOT ?? '/pehverse/repos/lab-utilities/lab-store',
+                  labStoreRoot: requiredDataRoot(...DATA_ROOT_VARIABLES.store),
                   store: {} as any,
                 });
               } catch (err) {

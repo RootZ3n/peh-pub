@@ -48,6 +48,7 @@ import { bridgeRegistry } from '../bridges/registry.js';
 import { teachingToolSpecs, createTeachingToolHandlers } from './teaching-tools.js';
 import { workOrderToolSpecs, createWorkOrderToolHandlers } from '../../tools/work-order-tools.js';
 import { occasioToolSpecs, createOccasioToolHandlers } from '../occasio-bridge.js';
+import { DATA_ROOT_VARIABLES, requiredDataRoot } from '../data-roots.js';
 
 export interface AgentToolConfig {
   /** Workspace root for file operations */
@@ -201,9 +202,17 @@ export function createFullToolRegistry(config: AgentToolConfig): ToolDef[] {
   const cronHandlers = createCronToolHandlers(cronExecute, { persistPath: cronStorePath, rearmOnLoad: true });
 
   // COORDINATION (Blocker 7): agent_sync over a shared directory.
-  const coordinationDir = config.coordinationDir
-    ?? process.env.AGENT_SYNC_DIR
-    ?? join(config.workspaceRoot, '..', 'lab-store', '.agent-sync');
+  /*
+    Fails closed: see ../data-roots.js. The sync directory is shared with four other agents, so a
+    fallback here means one writer coordinating against a copy nobody else can see.
+
+    Resolved LAZILY -- when the tool is used, not when the registry is wired. Refusal belongs at the
+    moment data would be opened or created; refusing at construction takes down every caller that
+    assembles a registry and never touches agent_sync, which is most of them.
+  */
+  const coordinationDir = config.coordinationDir !== undefined
+    ? config.coordinationDir
+    : (): string => requiredDataRoot(...DATA_ROOT_VARIABLES.sync);
   const agentId = config.agentId ?? config.workspaceRoot.split('/').filter(Boolean).pop() ?? 'agent';
   const coordinationHandlers = createCoordinationToolHandlers({ syncDir: coordinationDir, agentId });
 
